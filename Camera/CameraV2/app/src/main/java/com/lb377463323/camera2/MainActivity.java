@@ -6,6 +6,10 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -23,6 +27,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
@@ -31,7 +36,6 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Toast;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -44,7 +48,9 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SensorEventListener {
+
+    private static final String TAG = "#MainActivity";
     private static final SparseIntArray ORIENTATION = new SparseIntArray();
 
     static {
@@ -66,6 +72,10 @@ public class MainActivity extends Activity {
     private CaptureRequest mCaptureRequest;
     private CameraCaptureSession mCameraCaptureSession;
 
+
+    private SensorManager mSensorManager;
+    private Sensor mSensor;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -76,6 +86,11 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         mTextureView = (TextureView) findViewById(R.id.textureView);
+
+        //第一步：通过getSystemService获得SensorManager实例对象
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        //第二步：通过SensorManager实例对象获得想要的传感器对象:参数决定获取哪个传感器
+        mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
     }
 
     @Override
@@ -87,6 +102,40 @@ public class MainActivity extends Activity {
         } else {
             startPreview();
         }
+        /*
+         *第一个参数：SensorEventListener接口的实例对象
+         *第二个参数：需要注册的传感器实例
+         *第三个参数：传感器获取传感器事件event值频率：
+         *              SensorManager.SENSOR_DELAY_FASTEST = 0：对应0微秒的更新间隔，最快，1微秒 = 1 % 1000000秒
+         *              SensorManager.SENSOR_DELAY_GAME = 1：对应20000微秒的更新间隔，游戏中常用
+         *              SensorManager.SENSOR_DELAY_UI = 2：对应60000微秒的更新间隔
+         *              SensorManager.SENSOR_DELAY_NORMAL = 3：对应200000微秒的更新间隔
+         *              键入自定义的int值x时：对应x微秒的更新间隔
+         *
+         */
+        mSensorManager.registerListener(this, mSensor, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        // 大部分传感器会返回三个轴方向x,y,x的event值，值的意义因传感器而异
+        float Ax = event.values[0];
+        float Ay = event.values[1];
+        float Az = event.values[2];
+        double g=Math.sqrt(Ax*Ax+Ay*Ay+Az*Az);
+
+        double angleA = Math.atan(Ax / Math.sqrt(Ay*Ay + Az*Az))*180/Math.PI;
+        double angleB=  Math.atan(Ay / Math.sqrt(Ax*Ax+Az*Az))*180/Math.PI;
+        double angleC=  Math.atan( Az / Math.sqrt(Ax*Ax +Ay*Ay))*180/Math.PI;
+
+        //TODO 利用获得的三个float传感器值做些操作
+        Log.d(TAG, "onSensorChanged " + Ax + ", " + Ay + ", " + Az+", "+ "g " +g +"A:"+angleA+" ,"+"B:"+angleB+" ,"+"C:"+angleC);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        //TODO 在传感器精度发生改变时做些操作，accuracy为当前传感器精度
     }
 
     private void startCameraThread() {
@@ -310,6 +359,8 @@ public class MainActivity extends Activity {
             mImageReader.close();
             mImageReader = null;
         }
+
+        mSensorManager.unregisterListener(this);
     }
 
     private void setupImageReader() {
