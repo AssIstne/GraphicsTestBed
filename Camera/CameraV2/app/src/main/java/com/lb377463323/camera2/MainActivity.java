@@ -385,6 +385,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         @Override
         public void run() {
+            // TODO: 12/26/20 Image包含了YUV数据
             ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
             byte[] data = new byte[buffer.remaining()];
             buffer.get(data);
